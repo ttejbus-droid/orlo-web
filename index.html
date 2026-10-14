@@ -432,12 +432,14 @@ footer .meta{margin-top:40px;display:flex;flex-wrap:wrap;justify-content:space-b
 <label class="field" for="f-mail">E-mail<input id="f-mail" type="email" autocomplete="email" placeholder="jan@bistro.sk"></label>
 <label class="field" for="f-tel">Telefón<input id="f-tel" type="tel" autocomplete="tel" placeholder="+421"></label>
 <div class="full" style="display:flex;flex-direction:column;gap:14px;margin-top:6px">
+<input type="text" name="_honey" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;opacity:0;height:0;width:0">
+<p id="tb-err" role="alert" hidden style="margin:0;font-size:14px;line-height:1.5;color:#8A2B12"></p>
 <button type="submit" class="btn btn-ink" style="width:100%">Chcem test box</button>
 <span style="font-size:13px;color:#4A3A2C;line-height:1.5">Odoslaním súhlasíte so spracovaním údajov na účely ponuky.</span>
 </div>
 <div class="thanks" id="tb-thanks" hidden>
 <span class="d" style="font-weight:700;font-size:36px;letter-spacing:-0.03em">Máme to. Pec si môžete rozpáliť.</span>
-<span style="font-size:16px;line-height:1.55">Ozveme sa do 24 hodín a dohodneme doručenie. (Ukážka: formulár zatiaľ nie je napojený.)</span>
+<span style="font-size:16px;line-height:1.55">Ozveme sa do 24 hodín a dohodneme doručenie.</span>
 </div>
 </form>
 </div>
@@ -526,8 +528,33 @@ footer .meta{margin-top:40px;display:flex;flex-wrap:wrap;justify-content:space-b
 
   $('tb-form').addEventListener('submit', function(e){
     e.preventDefault();
-    Array.prototype.forEach.call(this.querySelectorAll('.field, .full'), function(el){ el.hidden = true; });
-    $('tb-thanks').hidden = false;
+    var form = this, btn = form.querySelector('button[type=submit]'), err = $('tb-err');
+    var v = function(id){ return ($(id).value || '').trim(); };
+    err.hidden = true;
+    if (!v('f-name') || (!v('f-mail') && !v('f-tel'))) {
+      err.textContent = 'Vyplňte prosím meno a aspoň e-mail alebo telefón.';
+      err.hidden = false; return;
+    }
+    if (form.querySelector('[name=_honey]').value) return;
+    var label = btn.textContent; btn.disabled = true; btn.textContent = 'Odosielam…';
+    fetch('https://formsubmit.co/ajax/tomas@folks.sk', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json', 'Accept': 'application/json'},
+      body: JSON.stringify({
+        _subject: 'ORLO test box: ' + v('f-biz') + ' (' + v('f-city') + ')',
+        _template: 'table', _captcha: 'false',
+        Meno: v('f-name'), Prevadzka: v('f-biz'), Mesto: v('f-city'), 'Typ pece': v('f-oven'),
+        Email: v('f-mail'), Telefon: v('f-tel'), _replyto: v('f-mail')
+      })
+    }).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ if (!r.ok || j.success === 'false' || j.success === false) throw new Error('send'); }); })
+    .then(function(){
+      Array.prototype.forEach.call(form.querySelectorAll('.field, .full'), function(el){ el.hidden = true; });
+      $('tb-thanks').hidden = false;
+    }).catch(function(){
+      btn.disabled = false; btn.textContent = label;
+      err.innerHTML = 'Odoslanie sa nepodarilo. Napíšte nám na <a href="mailto:tomas@folks.sk">tomas@folks.sk</a> alebo zavolajte na <a href="tel:+421915910594">0915 910 594</a>.';
+      err.hidden = false;
+    });
   });
 })();
 </script>
